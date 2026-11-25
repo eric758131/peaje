@@ -1,0 +1,38 @@
+# Carpetas que no van al repositorio (decisión del equipo)
+docs/
+entrenamiento/
+
+# Secretos: nunca al repositorio
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# Dependencias y compilados (se regeneran)
+node_modules/
+web/vendor/
+web/public/build/
+web/public/hot
+
+# Librería nativa de ONNX Runtime (55 MB). Se sube al hosting con el resto de web/,
+# o se descarga con: php artisan peaje:instalar-onnx
+web/modelos/onnxruntime/
+
+# Datos locales
+*.sqlite
+*.sqlite-journal
+web/storage/*.key
+web/storage/app/public/evidencias/
+
+# Editores y sistema
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Flutter
+movil/.dart_tool/
+movil/build/
+movil/.flutter-plugins
+movil/.flutter-plugins-dependencies
