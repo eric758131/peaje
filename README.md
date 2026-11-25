@@ -8,17 +8,16 @@ Una app móvil graba el paso de los vehículos por una caseta. La inteligencia a
 
 ## Integrantes y roles
 
+Proyecto individual.
+
 | Integrante | Rol |
 |---|---|
-| _(completar)_ | Modelos e inferencia (Colab) |
-| _(completar)_ | Web, API y agente |
-| _(completar)_ | App móvil |
-| _(completar)_ | Documentación, pruebas y video |
+| Eric | Todos los roles: modelos e inferencia en Colab, web, API, base de datos, tiempo real y agente, app móvil, despliegue, documentación, pruebas y video |
 
 ## Arquitectura
 
 ```
-App móvil (Flutter) ──https, X-Api-Key──►  Web Laravel · peaje.ericluna.shop
+App móvil (Flutter) ──https, Google──────►  Web Laravel · peaje.ericluna.shop
 Navegador ─────────https, Google OAuth──►   ├─ Panel en tiempo real ◄── Pusher (canal privado)
                                             ├─ API REST /api/v1 + MySQL
                                             ├─ Alertas (placa no registrada / sin saldo)
@@ -75,11 +74,11 @@ Está en **Consultar placa**, en el **botón flotante** de todas las páginas y 
 - **Si Colab está apagado,** responde igual con los datos de la base, sin Qwen, y lo indica.
 
 ### 3. Acceso
-- **Web:** **Continuar con Google** (OAuth 2.0). Solo entran las cuentas activas de la tabla `usuarios` (lista blanca); las demás ven **Acceso denegado**. También existe el login con correo y contraseña, que se apaga con `LOGIN_CON_CONTRASENA=false`.
+- **Web:** **Continuar con Google** (OAuth 2.0). Solo entran las cuentas activas de la tabla `usuarios` (lista blanca); las demás ven **Acceso denegado**. La cuenta del docente (`doc.alvaro.pinto.ma@unifranz.edu.bo`) ya está autorizada como **administrador** en producción. También existe el login con correo y contraseña, que se apaga con `LOGIN_CON_CONTRASENA=false`.
 - **Roles:**
   - **Administrador:** gestiona vehículos, tarifas, casetas y usuarios.
   - **Operador:** registra pasos y consulta placas.
-- **App móvil:** no tiene login. Se identifica en cada petición con la cabecera `X-Api-Key`, cuya clave queda dentro del APK al compilarlo.
+- **App móvil:** **Continuar con Google** (Google Sign-In). La app envía el ID token a `POST /api/v1/auth/google`, recibe un token propio y lo usa en cada petición (`Authorization: Bearer`). Las cuentas fuera de la lista blanca ven "Acceso denegado". La sesión queda guardada en el teléfono y se cierra con el botón de salir.
 - **API:** todas las rutas exigen `X-Api-Key` o un token, excepto `POST /api/v1/auth/google` (recibe el ID token de Google y devuelve un token propio) y `POST /api/v1/auth/login`.
 
 ### 4. Páginas de la web
@@ -114,7 +113,7 @@ Los pasajeros solo se **cuentan**. En la evidencia, las personas se cubren con s
 
 ## Modelos
 
-Por decisión del equipo se usan **modelos ya entrenados**, que el notebook descarga solo:
+Por decisión del proyecto se usan **modelos ya entrenados** sobre datasets públicos, que el notebook descarga solo. No se entrenó con un dataset propio de Roboflow.
 
 | Modelo | Qué es | Para qué |
 |---|---|---|
@@ -123,9 +122,20 @@ Por decisión del equipo se usan **modelos ya entrenados**, que el notebook desc
 | M3 | YOLOv8s (Open Images V7, clases Wheel y Tire); el centro de cada rueda es el keypoint | Ejes |
 | Agente | Qwen 2.5 3B con Ollama | Redactar las respuestas del chat |
 
-**Precisión del OCR** con 20 fotos propias: 95 % de placas exactas y 99,3 % de caracteres correctos.
+| Dataset | Imágenes | Clases | Clases que usa el sistema |
+|---|---|---|---|
+| [COCO 2017](https://docs.ultralytics.com/datasets/detect/coco) | 118.287 de entrenamiento, 5.000 de validación | 80 | car, motorcycle, bus, truck, person |
+| [Open Images V7](https://docs.ultralytics.com/datasets/detect/open-images-v7) | 1.743.042 de entrenamiento, 41.620 de validación | 601 | Wheel, Tire, Van |
+| Conjunto propio de evaluación | 20 fotos de vehículos registrados | 3 | auto (17), minibús (2), camión (1) |
 
-El notebook también tiene celdas opcionales para entrenar M2 y M3 con un dataset propio de Roboflow. Si existen pesos propios en Drive, se usan automáticamente.
+**Métricas medidas en producción** con las 20 fotos propias (detalle en el informe técnico):
+
+| Métrica | Resultado |
+|---|---|
+| Placas leídas exactamente (OCR) | 90 % (18 de 20), 94,3 % de caracteres correctos |
+| Error en el conteo de ejes | 0 (18 de 18 correctos) |
+| mAP50-95 de referencia | M2: 39,6 cajas y 33,9 máscaras en COCO · M3: 27,7 en Open Images V7 |
+| Latencia de punta a punta | 3,75 s de media, 4,71 s en el percentil 95 |
 
 ## Tecnologías
 
@@ -138,7 +148,7 @@ El notebook también tiene celdas opcionales para entrenar M2 y M3 con un datase
 | Documentación API | Scramble (OpenAPI) |
 | Inferencia | Google Colab (GPU T4), Ultralytics YOLO, fast-plate-ocr, ONNX Runtime, FastAPI, Cloudflare Tunnel |
 | Agente | Ollama + Qwen 2.5 3B, function calling desde Laravel |
-| App móvil | Flutter (camera, image_picker, http) |
+| App móvil | Flutter (camera, image_picker, http, google_sign_in, shared_preferences) |
 | Hosting | cPanel compartido con SSL (subdominio `peaje.ericluna.shop`) |
 
 ## Estructura del repositorio
@@ -146,7 +156,8 @@ El notebook también tiene celdas opcionales para entrenar M2 y M3 con un datase
 ```
 sistema-peaje/
 ├── web/              Laravel: web, API, agente, tiempo real
-├── inferencia/       peaje_colab.ipynb: un solo notebook con entorno, modelos, endpoint y agente
+├── inferencia/       peaje_colab.ipynb: un solo notebook con entorno, modelos, endpoint y agente;
+│                     requirements.txt con las versiones fijas
 ├── movil/            App Flutter (Modo Caseta y Modo Consulta)
 ├── .env.example      Plantilla de variables (copiar a web/.env)
 └── README.md
@@ -173,8 +184,9 @@ sistema-peaje/
 ### App móvil
 Desde la carpeta `movil/`:
 ```
-flutter build apk --release --dart-define=API_BASE_URL=https://peaje.ericluna.shop/api/v1 --dart-define=API_KEY=<MOVIL_API_KEY del servidor>
+flutter build apk --release --dart-define=API_BASE_URL=https://peaje.ericluna.shop/api/v1
 ```
+Para el login con Google en Android hay que crear en Google Cloud un **ID de cliente de tipo Android** con el paquete `shop.ericluna.peaje` y el SHA-1 del certificado con que se firma el APK (`keytool -list -v -keystore %USERPROFILE%\.android\debug.keystore -alias androiddebugkey -storepass android`). La app usa el ID de cliente **web** (`GOOGLE_CLIENT_ID`) para pedir el ID token.
 El APK queda en `movil/build/app/outputs/flutter-apk/app-release.apk`. Funciona por WiFi o con datos móviles.
 
 ### Desarrollo local
@@ -195,22 +207,23 @@ php artisan test               # pruebas
 
 | Servicio | Versiones | Diagnóstico |
 |---|---|---|
-| Inferencia (Colab) | Fijadas en la celda 2 del notebook (escribe `requirements.txt`) | La celda 2 imprime Python, torch, CUDA, GPU y ultralytics |
+| Inferencia (Colab) | [`inferencia/requirements.txt`](inferencia/requirements.txt); la celda 2 del notebook instala esas versiones exactas | La celda 2 imprime Python, torch, CUDA, GPU y ultralytics. En local: `python -m venv .venv` y `pip install -r requirements.txt` |
 | Web (Laravel) | `web/composer.lock` y `web/package-lock.json` | `php artisan about` y la página **Estado de la IA** |
 | App móvil | `movil/pubspec.lock` | `flutter --version` |
 
 ## Pruebas
-- **Web:** 123 pruebas automáticas (PHPUnit). Cubren API, roles, login con Google, inferencia, agente y memoria, alertas y CRUD.
-- **App:** `flutter analyze` y pruebas de los modelos de datos.
-- **De punta a punta:** en el navegador y en un emulador Android contra el servidor de producción.
+- **Web:** 128 pruebas automáticas (PHPUnit). Cubren API, roles, login con Google, inferencia, agente y memoria, alertas, tiempo real y CRUD.
+- **App:** `flutter analyze` sin advertencias y 10 pruebas de los modelos de datos.
+- **De punta a punta:** en el navegador, en un emulador Android contra el servidor de producción y en un teléfono real.
 
 ## Enlaces
 
-- Subdominio: https://peaje.ericluna.shop
-- Documentación de la API: https://peaje.ericluna.shop/docs/api
-- Endpoint de inferencia: Google Colab (el link cambia en cada sesión; se configura en *Estado de la IA*)
-- Datasets: modelos ya entrenados (COCO, Open Images V7 y detector de placas); sin dataset propio de Roboflow
-- Carpeta de evidencias: _(completar)_
+- **Subdominio (producción):** https://peaje.ericluna.shop
+- **Documentación de la API:** https://peaje.ericluna.shop/docs/api
+- **Repositorio:** https://github.com/eric758131/peaje
+- **Endpoint de inferencia:** Google Colab con túnel de Cloudflare (`https://<túnel>.trycloudflare.com`, rutas `/health`, `/inferir` y `/agente/chat`). El link cambia en cada sesión de Colab y se configura en **Estado de la IA → Conexión con Colab**; esa página muestra el link activo.
+- **Datasets:** no se usó un dataset propio de Roboflow; los modelos están entrenados en [COCO 2017](https://docs.ultralytics.com/datasets/detect/coco) y [Open Images V7](https://docs.ultralytics.com/datasets/detect/open-images-v7).
+- **Carpeta de evidencias (video, informe, APK, capturas, API):** _(enlace de Google Drive)_
 
 ## Seguridad
 

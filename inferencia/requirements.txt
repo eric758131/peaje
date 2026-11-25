@@ -1,0 +1,19 @@
+# Servicio de inferencia y agente (Google Colab, GPU T4). Versiones fijas.
+# La celda 2 de peaje_colab.ipynb instala exactamente estas versiones e imprime el diagnóstico
+# (Python, torch, CUDA, GPU, ultralytics). torch, CUDA y numpy son los que trae el entorno de Colab.
+#
+# Instalación local con venv:
+#   python -m venv .venv
+#   .venv\Scripts\activate        (Linux/Mac: source .venv/bin/activate)
+#   pip install -r requirements.txt
+#
+# El agente usa además Ollama (se instala en la celda 8) con el modelo qwen2.5:3b.
+ultralytics==8.4.218
+fast-plate-ocr[onnx]==1.1.0
+onnxruntime==1.23.2
+roboflow==1.7.3
+fastapi==0.162.5
+uvicorn==0.54.0
+python-multipart==0.0.32
+requests==2.34.2
+opencv-python-headless==5.1.0.95
